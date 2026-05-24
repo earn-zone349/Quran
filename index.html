@@ -10,16 +10,7 @@
 <meta name="robots" content="index, follow">
 <meta name="author" content="EarnZone Pro">
 
-<!-- PWA Manifest -->
-<link rel="manifest" href="data:application/json,{
-  &quot;name&quot;:&quot;EarnZone Pro&quot;,
-  &quot;short_name&quot;:&quot;EarnZone&quot;,
-  &quot;start_url&quot;:&quot;/&quot;,
-  &quot;display&quot;:&quot;standalone&quot;,
-  &quot;background_color&quot;:&quot;#0f172a&quot;,
-  &quot;theme_color&quot;:&quot;#2563eb&quot;,
-  &quot;icons&quot;:[{&quot;src&quot;:&quot;/icon.png&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/png&quot;}]
-}">
+<!-- PWA Manifest (inline via JS) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EarnZone Pro">
@@ -452,6 +443,15 @@ firebase.initializeApp({
 const fAuth = firebase.auth();
 const fDB   = firebase.database();
 fAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+// ── PWA Manifest inject ──
+(function(){
+  const mf=document.createElement('link');
+  mf.rel='manifest';
+  const manifest={name:'EarnZone Pro',short_name:'EarnZone',start_url:'/',display:'standalone',background_color:'#0f172a',theme_color:'#2563eb'};
+  mf.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(manifest));
+  document.head.appendChild(mf);
+})();
 
 // ─── CONFIG ───────────────────────────────────────────
 const CFG = {
@@ -2308,9 +2308,7 @@ function buildHome(){
       <span>🏆 Top Earners</span>
       <button onclick="S.page='leaderboard';render()" style="background:none;border:none;cursor:pointer;font-size:12px;color:#2563eb;font-weight:700">See All →</button>
     </div>
-    <div id="lbPreview">${S.leaderboard.length?buildLeaderboardSection().split('</div>
-    <div class="lb-row').slice(0,3).join('</div>
-    <div class="lb-row')+'</div>':buildSkeleton(3)}</div>
+    <div id="lbPreview">${S.leaderboard.slice(0,3).length?S.leaderboard.slice(0,3).map((u,i)=>{const ri=['🥇','🥈','🥉'];return '<div class="lb-row'+(i===0?' top1':i===1?' top2':i===2?' top3':'')+'" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:13px;margin-bottom:8px;background:#fff;border:1.5px solid #dbeafe"><div style="font-size:16px;font-weight:800;width:28px;text-align:center">'+ri[i]+'</div><div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;flex-shrink:0">'+(u.name||u.email||'?')[0].toUpperCase()+'</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+(u.name||u.email?.split?.('@')[0]||'User')+(u.uid===S.user?.uid?' <span style=color:#2563eb;font-size:10px>(You)</span>':'')+'</div><div style="font-size:11px;color:#059669;font-weight:700">'+fmt$(u.usdEarned||0)+' earned</div></div></div>';}).join(''):buildSkeleton(3)}</div>
   </div>
 
   <!-- BADGES PREVIEW -->
@@ -3483,22 +3481,7 @@ window.addEventListener('popstate',()=>{
 });
 
 // ─── POSTBACK LISTENER (REST-based) ───────────────────
-// When CPA network hits postback URL, write to Firebase:
-// PUT https://earn-zone-997fb-default-rtdb.firebaseio.com/postbacks/{uid}_{wallId}.json
-// body: {"amount":0.30,"offerId":"xxx"}
-// The app checks /postbacks on load and processes them.
-(async()=>{
-  if(!S.user) return;
-  const snap=await fDB.ref(`postbacks/${S.user.uid}`).once('value');
-  const data=snap.val()||{};
-  for(const [key,val] of Object.entries(data)){
-    if(!val.processed && val.amount){
-      const wallId=val.wallId||key.split('_')[1]||'w1';
-      await markOfferComplete(S.user.uid,wallId,val.amount);
-      await fDB.ref(`postbacks/${S.user.uid}/${key}/processed`).set(true);
-    }
-  }
-})().catch(()=>{});
+// Moved inside onAuthStateChanged — S.user guaranteed to exist there
 
 async function loadAdminSettings(c){
   // Load current settings
